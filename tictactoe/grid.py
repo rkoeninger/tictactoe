@@ -6,29 +6,20 @@ class Grid:
     def __init__(self, size):
         self.size = size
         self.spread = range(0, self.size)
-        self.values = list(repeat(list(repeat(None, size)), size))
+        self.values = list(repeat(list(repeat(' ', size)), size))
 
     def mark_at(self, at):
         (x, y) = at
         return self.values[x][y]
 
-    def is_mark_at(self, at):
-        return self.mark_at(at) is not None
-
     def is_full(self):
-        return all(map(self.is_mark_at, self.everywhere()))
+        return all(map(lambda at: self.mark_at(at) != ' ', self.everywhere()))
 
     def is_winner(self, mark):
         return any(map(lambda line: all(map(lambda at: self.mark_at(at) == mark, line)), self.lines()))
 
     def winner(self):
-        if self.is_winner("X"):
-            return "X"
-
-        if self.is_winner("Y"):
-            return "Y"
-
-        return None
+        return 'Y' if self.is_winner('Y') else 'X' if self.is_winner('X') else ' '
 
     def everywhere(self):
         for x in self.spread:
@@ -47,35 +38,37 @@ class Grid:
         yield map(lambda z: (z, z), self.spread)
         yield map(lambda z: (z, -z), self.spread)
 
-    @staticmethod
-    def opponent(mark):
-        if mark == "X":
-            return "O"
-
-        if mark == "O":
-            return "X"
+    # A potential win is a 3-in-a-row line with 2
+    # of the player's mark and an blank space
+    def has_potential_win(self, line, mark):
+        if list(sorted(map(self.mark_at, line))) == [' ', mark, mark]:
+            return list(filter(lambda a: self.mark_at(a) == ' ', line))[0]
 
         return None
 
-    # A potential win is a 3-in-a-row line with 2
-    # of the player's mark and an blank space
-    def find_win(self, line, mark):
-        mark_count = 0
-        none_count = 0
-        none_at = None
+    def find_win(self, mark):
+        for l in self.lines():
+            win = self.has_potential_win(l, mark)
+            if win is not None:
+                return win
 
-        for at in line:
-            here = self.mark_at(at)
+        return None
 
-            if here == mark:
-                mark_count = mark_count + 1
+    # A potential fork position is blank and is part of
+    # at least 2 lines each of which contains only a
+    # single non-blank position which is held by given mark
+    def has_potential_fork(self, at, mark):
+        if self.mark_at(at) != ' ':
+            return None
 
-            if here is None:
-                none_count = none_count + 1
-                none_at = at
+        lines = filter(lambda l: at in l, self.lines())
+        lines = filter(lambda l: 1 if list(sorted(map(self.mark_at, l))) == [' ', ' ', mark] else 0, lines)
+        return at if len(list(lines)) >= 2 else None
 
-        if mark_count == 2 and none_count == 1:
-            return none_at
+    def find_fork(self, mark):
+        for at in self.everywhere():
+            if self.has_potential_fork(at, mark):
+                return at
 
         return None
 
@@ -87,22 +80,28 @@ class Grid:
             return None
 
         # If you can win, win
-        for l in self.lines():
-            win = self.find_win(l, mark)
-            if win is not None:
-                return win
+        my_win = self.find_win(mark)
+
+        if my_win is not None:
+            return my_win
 
         # If the opponent is going to win, stop them
-        for l in self.lines():
-            win = self.find_win(l, Grid.opponent(mark))
-            if win is not None:
-                return win
+        their_win = self.find_win(Grid.opponent(mark))
+
+        if their_win is not None:
+            return their_win
 
         # If you can make a fork, do so
-        # TODO: implement potential fork detection
+        my_fork = self.find_fork(mark)
+
+        if my_fork is not None:
+            return my_fork
 
         # If the opponent is going to make a fork, stop them
-        # TODO: implement potential fork detection
+        their_fork = self.find_fork(Grid.opponent(mark))
+
+        if their_fork is not None:
+            return their_fork
 
         # Pick a spot, with priority: center, corner, side
         priority = [
@@ -121,5 +120,9 @@ class Grid:
             if self.mark_at(at) is None:
                 return at
 
-        # Should reach this point, but give up if you do
+        # Shouldn't reach this point, but give up if you do
         return None
+
+    @staticmethod
+    def opponent(mark):
+        return 'X' if mark == 'O' else 'O' if mark == 'X' else ' '
