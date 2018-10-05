@@ -117,7 +117,7 @@ class Grid:
         ]
 
         for at in priority:
-            if self.mark_at(at) is None:
+            if self.mark_at(at) == ' ':
                 return at
 
         # Shouldn't reach this point, but give up if you do
